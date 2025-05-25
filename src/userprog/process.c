@@ -31,8 +31,9 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
 
   char *fn_copy; // file_name의 복사본
   char *program_name; // 프로그램 이름 (실행할 파일 이름)
-  char *save_ptr; // strtok_r를 위한 포인터
+  char *save_ptr; // strtok_r를 위한 포인터 (근데 여기서는 dummy 역할)
   char *fn_copy_for_start_process; // start_process에 전달할 인자들
+  
   tid_t tid;
 
   /* 1. Program name parsing하기 */
@@ -41,7 +42,7 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   strlcpy (fn_copy, file_name, PGSIZE);
 
   program_name = strtok_r (fn_copy, " ", &save_ptr); // program name 파싱 완료
-  if (program_name == NULL) { // file_name이 비어있는 경우
+  if (filesys_open(program_name) == NULL) { // 실제로 있는 파일인지?
     palloc_free_page (fn_copy);
     return TID_ERROR; 
   }
@@ -54,31 +55,43 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   }
   strlcpy (fn_copy_for_start_process, file_name, PGSIZE);
 
-
-  printf("전달한 program_name: %s\n", program_name); // 디버깅용 출력
-  printf("전달한 fn_copy_for_start_process: %s\n", fn_copy_for_start_process); // 디버깅용 출력
-
+  struct thread *cur = thread_current ();
   tid = thread_create (program_name, PRI_DEFAULT, start_process, fn_copy_for_start_process);
-  if (tid == TID_ERROR) { // thread 생성 실패 시
+  
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     palloc_free_page (fn_copy_for_start_process);
-    return TID_ERROR;
+    return TID_ERROR; // thread 생성 실패
+  }
+  sema_down (&cur->load_sema);
+  
+
+  for (struct list_elem* e = list_begin (&cur->children); e != list_end (&cur->children); e = list_next (e)) {
+    struct thread *child = list_entry (e, struct thread, child_elem);
+    if (child->exit_status == -1) { // 자식 프로세스가 load에 실패한 경우
+      palloc_free_page (fn_copy);
+      palloc_free_page (fn_copy_for_start_process);
+      
+      return process_wait (tid); // 자식 프로세스의 exit status를 기다림
+
+      // return TID_ERROR; // TID_ERROR 반환
+    }
   }
 
 
-  /* 자식 thread가 load를 끝날 때까지 대기 */
-  struct thread *child = get_thread_by_tid (tid);
+  // /* 자식 thread가 load를 끝날 때까지 대기 */
+  // struct thread *child = get_thread_by_tid (tid);
 
-  sema_down (&child->load_sema); // 자식 프로세스 로드 완료 대기
-  if (!child->load_success) { // load 실패 시
-    palloc_free_page (fn_copy);
-    return TID_ERROR;
-  }
+  // sema_down (&child->load_sema); // 자식 프로세스 로드 완료 대기
+  // if (!child->load_success) { // load 실패 시
+  //   palloc_free_page (fn_copy);
+  //   return TID_ERROR;
+  // }
   
 
   list_push_back (&thread_current()->children, &child->child_elem); // 부모의 children list에 추가
 
-  palloc_free_page (fn_copy);
+  // palloc_free_page (fn_copy);
   return tid;
 
 }
@@ -86,88 +99,69 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *program_name_and_args_) /* --- (hw3) 전체 수정함 --- */
+start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
 {
-  char *program_name_and_args = program_name_and_args_;
-  char *program_name;
-  char *save_ptr; 
-
-
-  printf("전달 받은 program_name_and_args: %s\n", program_name_and_args); // 디버깅용 출력
-    
+  char *file_name = file_name_;
+  // char *program_name;
+  // char *save_ptr; 
+  
   struct intr_frame if_;
   bool success;
 
-  /* 1. load()에 전달할 인자 program name parsing하기 */
-  char *cmd_line_copy = palloc_get_page (0);
-  if (cmd_line_copy == NULL) {
-    palloc_free_page (program_name_and_args);
-    palloc_free_page (cmd_line_copy);
-    thread_exit ();
-  }
-  strlcpy (cmd_line_copy, program_name_and_args, PGSIZE);
-  program_name = strtok_r (cmd_line_copy, " ", &save_ptr);
-  if (program_name == NULL) { // program_name이 비어있는 경우
-    thread_current()->exit_status = -1;
-    palloc_free_page (cmd_line_copy);
-    palloc_free_page (program_name_and_args);
-    thread_exit ();
-  }
-
-  /* 2. interrupt frame 초기화 */
+  /* 1. interrupt frame 초기화 */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
+  /* 2. load()에 전달할 인자 program name parsing하기 */
+  // char *fn_copy = palloc_get_page (0);
+  // if (fn_copy == NULL) {
+  //   palloc_free_page (file_name);
+  //   palloc_free_page (fn_copy);
+  //   thread_exit ();
+  // }
+  // strlcpy (fn_copy, file_name, PGSIZE);
+  // program_name = strtok_r (fn_copy, " ", &save_ptr);
 
-  printf("load에 사용한 program_name: %s\n", program_name); // 디버깅용 출력
+  /* 3. Argument Parsing하기 */
 
-  /* 3. load() 실행 */
-  success = load(program_name, &if_.eip, &if_.esp);
-  struct thread *cur = thread_current ();
-  cur->load_success = success;
-  sema_up (&cur->load_sema);
-
-  if (!success) { // load 실패 시
-    palloc_free_page (cmd_line_copy);
-    palloc_free_page (program_name_and_args);
-    thread_current()->exit_status = -1; // exit status 설정
-    thread_exit ();
-  } 
-
-  printf("여기까지 도달하긴 하나?\n"); // 디버깅용 출력
-
-
-  /* --- Argument Passing --- */
-  
   char *token; // 각 인자 임시 저장
   char *save_ptr_args; // 인자 파싱용 포인터
   int argc = 0; // 인자 개수
-  void *argv_on_stack_ptr[128]; // User 스택에 저장된 각 인자 문자열의 주소를 임시 저장하는 배열
+  // argv 저장할 배열 생성하기
+  char argv[128][PGSIZE]; // 최대 128개의 인자, 각 인자는 PGSIZE 크기
 
-  /* 1. 인자들을 stack에 복사하고, 그 주소들을 argv_on_stack에 저장 */
-  for (token = strtok_r(program_name_and_args, " ", &save_ptr_args);
+  for (token = strtok_r(fn_copy, " ", &save_ptr_args);
         token != NULL;
-        token = strtok_r(NULL, " ", &save_ptr_args) ) {
+        token = strtok_r(NULL, " ", &save_ptr_args)) {
     
     if (argc < 128) {
-      if_.esp -= (strlen(token) + 1); // 문자열 길이 + Null 만큼 공간 sp 확보
-      memcpy(if_.esp, token, strlen(token)+1); // 스택에 인자 문자열 복사
-      argv_on_stack_ptr[argc] = if_.esp; // 스택 어디에 저장됐는지 배열에 임시로 저장
+      strlcpy(argv[argc], token, PGSIZE); // 인자 문자열을 argv 배열에 저장
       argc++;
-      
     } else {
       break; // 인자가 너무 많으면 무시
     }
+  }
+
+  /* 4. load() 실행 */
+  success = load(argv[0], &if_.eip, &if_.esp);
+  if (!success) { // load 실패 시
+    // thread_current()->exit_status = -1; // exit status 설정
+    thread_exit ();
+  } else { // load 성공 시
+    void **sp = &if_.esp; // stack pointer
+
+    while ((uintptr_t)*sp % 4 != 0) { // sp가 4의 배수가 될 때까지 조정
+      (*sp)--; // sp를 감소시켜서 4의 배수로 만듦
+      *(uint8_t *)(*sp) = 0; // 0으로 채움
+    }
+
+
+
 
   }
 
-  /* 2. sp가 4의 배수가 되도록 조정 */
-  while ((uintptr_t)if_.esp % 4 != 0) {
-    if_.esp--;
-    *(uint8_t *)if_.esp = 0;
-  }  
 
   /* 3. argv 배열의 끝을 표시하기 위해 NULL sentinel 설정 */
   if_.esp -= sizeof(char *);
@@ -197,8 +191,112 @@ start_process (void *program_name_and_args_) /* --- (hw3) 전체 수정함 --- *
   if_.esp -= sizeof(int);
   *(int *) if_.esp = argc;
 
-  palloc_free_page (program_name_and_args);
-  palloc_free_page (cmd_line_copy);
+  palloc_free_page (file_name);
+  palloc_free_page (fn_copy);
+
+
+
+  // char *token; // 각 인자 임시 저장
+  // char *save_ptr_args; // 인자 파싱용 포인터
+  // int argc = 0; // 인자 개수
+  // void *argv_on_stack_ptr[128]; // User 스택에 저장된 각 인자 문자열의 주소를 임시 저장하는 배열
+
+
+// /* 1. 인자들을 stack에 복사하고, 그 주소들을 argv_on_stack에 저장 */
+//   for (token = strtok_r(file_name, " ", &save_ptr_args);
+//         token != NULL;
+//         token = strtok_r(NULL, " ", &save_ptr_args) ) {
+    
+//     if (argc < 128) {
+//       if_.esp -= (strlen(token) + 1); // 문자열 길이 + Null 만큼 공간 sp 확보
+//       memcpy(if_.esp, token, strlen(token)+1); // 스택에 인자 문자열 복사
+//       argv_on_stack_ptr[argc] = if_.esp; // 스택 어디에 저장됐는지 배열에 임시로 저장
+//       argc++;
+      
+//     } else {
+//       break; // 인자가 너무 많으면 무시
+//     }
+
+//   }
+
+
+
+  // /* 3. load() 실행 */
+  // success = load(argv[0], &if_.eip, &if_.esp);
+  // struct thread *cur = thread_current ();
+  // cur->load_success = success;
+  // sema_up (&cur->load_sema);
+
+  // if (!success) { // load 실패 시
+  //   palloc_free_page (fn_copy);
+  //   palloc_free_page (file_name);
+  //   thread_current()->exit_status = -1; // exit status 설정
+  //   thread_exit ();
+  // } 
+
+  // printf("여기까지 도달하긴 하나?\n"); // 디버깅용 출력
+
+
+  // /* --- Argument Passing --- */
+  
+  // char *token; // 각 인자 임시 저장
+  // char *save_ptr_args; // 인자 파싱용 포인터
+  // int argc = 0; // 인자 개수
+  // void *argv_on_stack_ptr[128]; // User 스택에 저장된 각 인자 문자열의 주소를 임시 저장하는 배열
+
+  // /* 1. 인자들을 stack에 복사하고, 그 주소들을 argv_on_stack에 저장 */
+  // for (token = strtok_r(file_name, " ", &save_ptr_args);
+  //       token != NULL;
+  //       token = strtok_r(NULL, " ", &save_ptr_args) ) {
+    
+  //   if (argc < 128) {
+  //     if_.esp -= (strlen(token) + 1); // 문자열 길이 + Null 만큼 공간 sp 확보
+  //     memcpy(if_.esp, token, strlen(token)+1); // 스택에 인자 문자열 복사
+  //     argv_on_stack_ptr[argc] = if_.esp; // 스택 어디에 저장됐는지 배열에 임시로 저장
+  //     argc++;
+      
+  //   } else {
+  //     break; // 인자가 너무 많으면 무시
+  //   }
+
+  // }
+
+  // /* 2. sp가 4의 배수가 되도록 조정 */
+  // while ((uintptr_t)if_.esp % 4 != 0) {
+  //   if_.esp--;
+  //   *(uint8_t *)if_.esp = 0;
+  // }  
+
+  // /* 3. argv 배열의 끝을 표시하기 위해 NULL sentinel 설정 */
+  // if_.esp -= sizeof(char *);
+  // *(char **)if_.esp = NULL;
+
+  // /* 4. argv[0]부터 순서대로 push */
+  // int i;
+  // for (i = argc - 1; i >= 0; i--) {
+  //   // 각 인자의 문자열 주소를 저장할 공간 확보 및 저장
+  //   if_.esp -= sizeof(char *);
+  //   *(void **)if_.esp = argv_on_stack_ptr[i]; // 인자 문자열이 저장된 스택 주소를 저장
+  // }
+
+  // /* 5. argv 배열의 시작 주소 */ 
+  // void *argv_start_addr = if_.esp;  
+
+  // /* 5-1. 가짜 return 주소 */
+  // if_.esp -= sizeof(void *);
+  // *(void **)if_.esp = 0;
+
+
+  // /* 5-2. argv 시작 주소 스택에 push */
+  // if_.esp -= sizeof(char **); 
+  // *(void **)if_.esp = argv_start_addr;
+
+  // /* 5-3. argc 스택에 push */
+  // if_.esp -= sizeof(int);
+  // *(int *) if_.esp = argc;
+
+  // palloc_free_page (file_name);
+  // palloc_free_page (fn_copy);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
