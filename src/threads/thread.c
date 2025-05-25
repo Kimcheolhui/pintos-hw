@@ -128,7 +128,7 @@ thread_tick (void) // timer interrupt가 발생할 때마다 호출되며, 현�
   if (t == idle_thread)
     idle_ticks++;
 #ifdef USERPROG
-  else if (t->pagedir != NULL) // (hw3) user process인 경우 pagedir가 NULL이 아니다.
+  else if (t->pagedir != NULL) // user process인 경우 pagedir가 NULL이 아니다.
     user_ticks++;
 #endif
   else
@@ -291,17 +291,7 @@ thread_exit (void) // 현재 thread를 종료하고 dying 상태로 변경, 다�
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-
-  /* --- Edit for hw3 --- start */
-  // 현재 Process를 가져와서
-  struct thread *cur = thread_current();
-  bool is_user = (cur->pagedir != NULL); // "cur->pagedir != NULL" 조건에 대해서는 "thread_tick" 함수 정의를 참고함
-  // 만약 이게 user process이면서, halt로 exiting되는 게 아니라면
-  if (is_user) printf("%s: exit(%d)\n", cur->name, cur->exit_status); 
-  
-  process_exit ();
-  /* --- end --- */
-  
+  process_exit ();  
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -484,15 +474,23 @@ init_thread (struct thread *t, const char *name, int priority) // 새로운 thre
 
   /* --- Edit for hw3 --- start */
 #ifdef USERPROG
-  t->exit_status = -1; // Process의 Exit Status를 -1로 초기화
-  list_init (&t->children); // 자식 Process 목록 초기화
-  sema_init (&t->load_sema, 0); // exec-load 동기화용 세마포어 초기화
-  sema_init (&t->exit_sema, 0); // wait 동기화용 세마포어 초기화
-  t->load_success = false; // exec-load 성공 여부 초기화
+  int i;
+  for (i = 0; i < 128; i++) t->fd[i] = NULL; // file descriptor 초기화
+
+  t->parent = thread_current ();    // 현재 thread를 부모로 설정
+  list_init (&t->children);         // 자식 Process 목록 초기화
+  sema_init (&t->child_sema, 0);    // 자식 Process 동기화용 세마포어 초기화
+  sema_init (&t->load_sema, 0);     // exec-load 동기화용 세마포어 초기화
+  sema_init (&t->memory_sema, 0);   // memory allocation 동기화용 세마포어 초기화
+
+  list_push_back (&(thread_current()->children), &t->child_elem); // 부모의 children list에 추가
+
 #endif
   /* --- end --- */
 
+  enum intr_level old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
+  intr_set_level (old_level);
 }
 
 

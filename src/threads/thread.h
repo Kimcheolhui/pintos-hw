@@ -4,8 +4,9 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
 #include "threads/synch.h" // (hw3) synch.h 추가
+#include "filesys/file.h" // (hw3) file.h 추가
+
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -99,17 +100,22 @@ struct thread
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+    uint32_t *pagedir;                 /* Page directory. */
 
     /* --- Edit for hw3 --- start */
-    int exit_status; /* Process의 Exit Status를 저장  */
+    int exit_status;                   /* Process의 Exit Status를 저장  */
+    struct file *fd[128];              /* Process가 열고 있는 파일 목록 (file descriptor) */
 
-    struct list children; /* 내 자식 process 목록 */
-    struct list_elem child_elem; /* 내가 부모의 children list에 들어갈 때 사용 */
+    struct thread *parent;             /* 부모 Process */
+    struct list children;              /* 내 자식 process 목록 */
+    struct list_elem child_elem;       /* 자식 process 목록에 들어갈 때 사용되는 list_elem */
 
-    struct semaphore load_sema; /* exec-load 동기화 */
-    struct semaphore exit_sema; /* wait 동기화 */
-    bool load_success; /* exec-load 성공 여부 */
+    // TODO: 수정 필요
+    struct semaphore child_sema; 
+    struct semaphore load_sema;        /* exec-load 동기화 */
+    struct semaphore memory_sema;      /* memory allocation 동기화 */
+
+   //  bool load_success; /* exec-load 성공 여부 */
    
     /* --- end --- */
 
