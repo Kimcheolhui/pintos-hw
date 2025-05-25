@@ -29,7 +29,6 @@ syscall_handler (struct intr_frame *f)
 {
   int *esp = f->esp;
   int syscall_num = *((int *) f->esp);
-  printf("디버깅디버깅디버깅4444444: %d\n", syscall_num); // 디버깅용 출력
 
   switch (syscall_num) {
     case SYS_HALT:
@@ -40,12 +39,12 @@ syscall_handler (struct intr_frame *f)
     case SYS_EXIT:
       { 
         int status = *((int *) (f->esp + 4));
-        printf("디버깅디버깅디버깅555555: %d\n", status); // 디버깅용 출력
         syscall_exit (status);
         break;
       }
     case SYS_EXEC: 
       {
+        printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) esp[1]); // 디버깅용 출력
         f->eax = process_execute ((const char*) esp[1]); 
         break;
       }
@@ -56,7 +55,6 @@ syscall_handler (struct intr_frame *f)
     }
     case SYS_WRITE:
       {
-        printf("디버깅디버깅디버깅666666:\n"); // 디버깅용 출력
         int fd = esp[1];
         const void *buf = (const void *) esp[2];
         unsigned size = (unsigned) esp[3];
@@ -78,6 +76,9 @@ syscall_handler (struct intr_frame *f)
 void syscall_exit (int status) {
   struct thread *cur = thread_current ();
   cur->exit_status = status;
+
+  printf ("%s: exit(%d)\n", cur->name, status); // 종료 메시지 출력
+
   thread_exit ();
 }
 
@@ -100,7 +101,7 @@ syscall_write (int fd, const void *buffer, unsigned size)
   if (fd == 1)
     {
       putbuf (buffer, size);
-      printf("디버깅디버깅디버깅777777: %d\n", size); // 디버깅용 출력
+      // printf("디버깅디버깅디버깅777777: %d\n", size); // 디버깅용 출력
       return (int) size;
     }
   /* 아직 지원 안 하는 경우 */
@@ -113,7 +114,7 @@ sys_read (int fd, void *buf, unsigned size) {
   if (fd == 0) {
     unsigned i;
     for (i = 0; i < size; i++) ((uint8_t *)buf)[i] = input_getc ();
-    printf("디버깅디버깅디버깅8888888: %d\n", size); // 디버깅용 출력
+    // printf("디버깅디버깅디버깅8888888: %d\n", size); // 디버깅용 출력
     return size;
   }
   return -1;

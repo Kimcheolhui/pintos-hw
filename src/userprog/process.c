@@ -103,66 +103,73 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
 
   if (!success) { // load 실패 시
     thread_exit (); // 현재 thread 종료
-  }
+  } else {
 
-  /* 3. User Stack 만들기 */
+    /* 3. User Stack 만들기 */
 
-  // 3-1) argv 배열 만들기
-  int argc = 0; // 인자 개수
-  char **argv[32]; // 최대 32개의 인자
-  char *token; // 각 인자 임시 저장
-  for (token = program_name;
-        token != NULL;
-        token = strtok_r(NULL, " ", &save_ptr)) {
-    if (argc < 128) {
-      argv[argc] = token;
-      argc++;
-    } else {
-      break; // 인자가 너무 많으면 무시
+    // 3-1) argv 배열 만들기
+    int argc = 0; // 인자 개수
+    // char **argv[32]; // 최대 32개의 인자
+    char **argv = palloc_get_page (0);
+    char *token; // 각 인자 임시 저장
+    for (token = program_name;
+          token != NULL;
+          token = strtok_r(NULL, " ", &save_ptr)) {
+      if (argc < 128) {
+        argv[argc] = token;
+        argc++;
+      } else {
+        break; // 인자가 너무 많으면 무시
+      }
     }
-  }
 
-  // 3-2) User Stack에 인자 문자열 복사
-  int i;
-  for (i = argc - 1; i >= 0; i--) {
-    if_.esp -= (strlen(argv[i]) + 1); // 문자열 길이 + Null 만큼 공간 확보
-    memcpy(if_.esp, argv[i], strlen(argv[i]) + 1); // User Stack에 인자 문자열 복사
-    argv[i] = if_.esp; // 인자 문자열이 저장된 User Stack 주소를 argv 배열에 저장
-  }
+    // 3-2) User Stack에 인자 문자열 복사
+    int i;
+    for (i = argc - 1; i >= 0; i--) {
+      if_.esp -= (strlen(argv[i]) + 1); // 문자열 길이 + Null 만큼 공간 확보
+      memcpy(if_.esp, argv[i], strlen(argv[i]) + 1); // User Stack에 인자 문자열 복사
+      argv[i] = if_.esp; // 인자 문자열이 저장된 User Stack 주소를 argv 배열에 저장
+    }
 
-  // 3-3). word alinment을 위해 Stack Pointer 조정
-  while ((uintptr_t)if_.esp % 4 != 0) { // sp가 4의 배수가 되도록
-    if_.esp--;
-    *(uint8_t *)if_.esp = 0; // 0으로 채움
-  }
+    // 3-3). word alinment을 위해 Stack Pointer 조정
+    while ((uintptr_t)if_.esp % 4 != 0) { // sp가 4의 배수가 되도록
+      if_.esp--;
+      *(uint8_t *)if_.esp = 0; // 0으로 채움
+    }
 
-  // 3-4). NULL sentinel 설정 (argv 배열의 끝을 NULL로 표시)
-  if_.esp -= sizeof(char *);
-  *(char **)if_.esp = NULL;
+    // // 3-4). NULL sentinel 설정 (argv 배열의 끝을 NULL로 표시)
+    // if_.esp -= sizeof(char *);
+    // *(char **)if_.esp = NULL;
 
-  // 3-5). 인자가 저장된 User Stack 주소를 스택에 저장
-  for (i = argc - 1; i >= 0; i--) {
-    // 각 인자의 문자열 주소를 저장할 공간 확보 및 저장
+    // 3-5). 인자가 저장된 User Stack 주소를 스택에 저장
+    for (i = argc - 1; i >= 0; i--) {
+      // 각 인자의 문자열 주소를 저장할 공간 확보 및 저장
+      if_.esp -= sizeof(char *);
+      *(void **)if_.esp = argv[i]; // 인자 문자열이 저장된 User Stack 주소를 저장
+    }
+
+    // 3-4). NULL sentinel 설정 (argv 배열의 끝을 NULL로 표시)
     if_.esp -= sizeof(char *);
-    *(void **)if_.esp = argv[i]; // 인자 문자열이 저장된 User Stack 주소를 저장
+    *(char **)if_.esp = NULL;
+
+    // TODO: 순서 반대가 아닌지 확인 필요
+
+    /* 4. argv 배열의 시작 주소 스택에 push */
+    void *argv_start_addr = if_.esp;
+    if_.esp -= sizeof(char **);
+    *(void **)if_.esp = argv_start_addr; // argv 배열의 시작 주소를 스택에 저장
+
+    /* 5. argc 스택에 push */
+    if_.esp -= sizeof(int);
+    *(int *)if_.esp = argc; // 인자 개수를 스택에 저장
+
+    /* 6. 가짜 return 주소를 스택에 push */
+    if_.esp -= sizeof(void *);
+    *(void **)if_.esp = 0; // 가짜 return 주소를 스택에 저장 (NULL로 설정)
   }
-
-  // TODO: 순서 반대가 아닌지 확인 필요
-
-  /* 4. argv 배열의 시작 주소 스택에 push */
-  void *argv_start_addr = if_.esp;
-  if_.esp -= sizeof(char **);
-  *(void **)if_.esp = argv_start_addr; // argv 배열의 시작 주소를 스택에 저장
-
-  /* 5. argc 스택에 push */
-  if_.esp -= sizeof(int);
-  *(int *)if_.esp = argc; // 인자 개수를 스택에 저장
-
-  /* 6. 가짜 return 주소를 스택에 push */
-  if_.esp -= sizeof(void *);
-  *(void **)if_.esp = 0; // 가짜 return 주소를 스택에 저장 (NULL로 설정)
 
   palloc_free_page (file_name);
+  // palloc_free_page (argv);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

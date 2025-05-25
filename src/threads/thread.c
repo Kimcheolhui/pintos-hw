@@ -477,7 +477,7 @@ init_thread (struct thread *t, const char *name, int priority) // 새로운 thre
   int i;
   for (i = 0; i < 128; i++) t->fd[i] = NULL; // file descriptor 초기화
 
-  t->parent = thread_current ();    // 현재 thread를 부모로 설정
+  t->parent = running_thread ();    // 현재 thread를 부모로 설정
   list_init (&t->children);         // 자식 Process 목록 초기화
   sema_init (&t->child_sema, 0);    // 자식 Process 동기화용 세마포어 초기화
   sema_init (&t->load_sema, 0);     // exec-load 동기화용 세마포어 초기화
