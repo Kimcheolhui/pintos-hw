@@ -105,12 +105,13 @@ struct thread
     /* --- Edit for hw3 --- start */
     int exit_status;                   /* Process의 Exit Status를 저장  */
     struct file *fd[128];              /* Process가 열고 있는 파일 목록 (file descriptor) */
+    bool load_success;                 /* exec-load 성공 여부 */
 
     struct thread *parent;             /* 부모 Process */
     struct list children;              /* 내 자식 process 목록 */
     struct list_elem child_elem;       /* 자식 process 목록에 들어갈 때 사용되는 list_elem */
 
-    // TODO: 수정 필요
+    // TODO
     struct semaphore child_sema; 
     struct semaphore load_sema;        /* exec-load 동기화 */
     struct semaphore memory_sema;      /* memory allocation 동기화 */
