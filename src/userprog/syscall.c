@@ -9,6 +9,11 @@
 #include "devices/input.h" // (hw3) 추가
 #include "threads/vaddr.h" // (hw3) 추가
 #include "userprog/pagedir.h" // (hw3) 추가
+// #include "threads/synch.h"  // (hw3) 추가
+// #include "filesys/filesys.h"  // (hw3) 추가
+// #include "filesys/file.h" // (hw3) 추가
+// #include "filesys/off_t.h" // (hw3) 추가
+// #include "devices/block.h"  // (hw3) 추가
 
 // void syscall_exit (int status);
 // void syscall_halt (void);
@@ -27,8 +32,11 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  int *esp = f->esp;
-  int syscall_num = *((int *) f->esp);
+  
+  int *sp = f->esp;
+  int syscall_num = *((int *) sp);
+
+  printf ("여기 도달하기는 하나?: %d\n", syscall_num);
 
   switch (syscall_num) {
     case SYS_HALT:
@@ -38,42 +46,45 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_EXIT:
       { 
-        int status = *((int *) (f->esp + 4));
-        syscall_exit (status);
+        printf ("[DEBUG] EXIT하는 중 입니다\n: %d\n", sp[1]); // 디버깅용 출력
+        // int status = *((int *) (sp + 4));
+        check_user (sp + 1); // 사용자 영역 주소인지 확인
+        exit (sp[1]);
         break;
       }
     case SYS_EXEC: 
       {
-        printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) esp[1]); // 디버깅용 출력
-        f->eax = process_execute ((const char*) esp[1]); 
+        printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) sp[1]); // 디버깅용 출력
+        f->eax = exec ((const char*) sp[1]); 
         break;
       }
     case SYS_WAIT: 
     {
-      f->eax = process_wait (esp[1]); 
+      f->eax = process_wait (sp[1]); 
       break;
     }
     case SYS_WRITE:
       {
-        int fd = esp[1];
-        const void *buf = (const void *) esp[2];
-        unsigned size = (unsigned) esp[3];
+        int fd = sp[1];
+        const void *buf = (const void *) sp[2];
+        unsigned size = (unsigned) sp[3];
         f->eax = syscall_write (fd, buf, size);
         break;
       }
     case SYS_READ:
       {
-        f->eax = sys_read (esp[1], (void*)esp[2], esp[3]);
+        f->eax = sys_read (sp[1], (void*)sp[2], sp[3]);
         break;
       }
     default:
-      syscall_exit (-1);
+      printf ("[DEBUG] 알 수 없는 system call: %d\n", syscall_num);
+      exit (-1);
       break;
   }
 
 }
 
-void syscall_exit (int status) {
+void exit (int status) {
   struct thread *cur = thread_current ();
   cur->exit_status = status;
 
@@ -82,14 +93,21 @@ void syscall_exit (int status) {
   thread_exit ();
 }
 
+int exec (const char *cmd_line) {
+  return process_execute (cmd_line);
+}
+
+
 void syscall_halt (void) {
   shutdown_power_off ();
 }
 
 
 static void check_user (const void *uaddr) {
-  if (!is_user_vaddr (uaddr) || pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
-    syscall_exit (-1);
+  // if (!is_user_vaddr (uaddr) || pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
+  if (!is_user_vaddr (uaddr))
+    printf("정말 너니너ㅣ너니ㅓ니ㅓ니ㅓ니너니ㅓㄴ??????????\n");
+    exit (-1);
 }
 
 
