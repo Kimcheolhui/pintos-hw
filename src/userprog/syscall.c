@@ -241,6 +241,7 @@ void exit (int status) {
 }
 
 int exec (const char *cmd_line) {
+  check_user(cmd_line);
   return process_execute (cmd_line);
 }
 
