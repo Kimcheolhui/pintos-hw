@@ -298,7 +298,7 @@ thread_exit (void) // 현재 thread를 종료하고 dying 상태로 변경, 다�
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  list_remove (&thread_current()->allelem); // 현재 thread를 종료하고 dying 상태로 변경
+  //list_remove (&thread_current()->allelem); // 현재 thread를 종료하고 dying 상태로 변경
   thread_current ()->status = THREAD_DYING;
   schedule (); // 다음 thread로 전환
   NOT_REACHED ();

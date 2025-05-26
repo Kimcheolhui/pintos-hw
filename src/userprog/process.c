@@ -28,7 +28,6 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
 {
-
   char *fn_copy; // file_name의 복사본
   char *program_name; // 프로그램 이름 (실행할 파일 이름)
   char *save_ptr; // strtok_r를 위한 포인터 (근데 여기서는 dummy 역할)
@@ -42,6 +41,8 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   strlcpy (fn_copy, file_name, PGSIZE);
   program_name = strtok_r (fn_copy, " ", &save_ptr); // program name 파싱 완료
 
+
+  
   /* 2. start_process 함수 실행 */
   fn_copy_for_start_process = palloc_get_page (0);
   if (fn_copy_for_start_process == NULL) {
@@ -52,7 +53,7 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
 
   struct thread *cur = thread_current ();
   tid = thread_create (program_name, PRI_DEFAULT, start_process, fn_copy_for_start_process);
-  
+
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     palloc_free_page (fn_copy_for_start_process);
@@ -63,6 +64,7 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   struct thread *child = get_thread_by_tid (tid);
   sema_down (&child->load_sema); // child가 load 결과 알려줄 때까지 대기
   
+  //printf("[DEBUG] child success: %d\n", child->load_success);
   if (!child->load_success) { // load 실패 시
     palloc_free_page (fn_copy);
     palloc_free_page (fn_copy_for_start_process);
@@ -70,6 +72,7 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   }
   list_push_back (&cur->children, &child->child_elem); // 부모의 children list에 추가
 
+  //printf("[DEBUG] pass all\n");
   palloc_free_page (fn_copy);
   return tid;
 }
@@ -99,7 +102,10 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
   cur->load_success = success; // load 성공 여부 저장
   sema_up (&cur->load_sema); // load 결과를 부모 process에게 알림 (process_execute에서 대기 중인 부모에게 신호)
 
+  //printf("[DEBUG] success in start_process %d\n", cur->load_success);
+
   if (!success) { // load 실패 시
+    cur->exit_status = -1;
     thread_exit (); // 현재 thread 종료
   } else {
 
@@ -197,7 +203,8 @@ process_wait (tid_t child_tid)
     if (child->tid == child_tid) { // 자식 프로세스 찾음
       sema_down (&child->child_sema); // 자식 프로세스가 종료될 때까지 대기
       int exit_status = child->exit_status;
-//      list_remove (elem); // 자식 프로세스 리스트에서 제거
+      list_remove (elem); // 자식 프로세스 리스트에서 제거
+      sema_up (&child->memory_sema);
       return exit_status; // 자식의 exit status 반환
     }
   }
@@ -215,6 +222,7 @@ process_exit (void)
 
   /* (hw3) wait()를 위해 부모에게 exit 통보 */
   sema_up (&cur->child_sema); 
+  sema_down (&cur->memory_sema);
 
 
   /* Destroy the current process's page directory and switch back
@@ -341,6 +349,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  printf("[DEBUG] filename: %s\n", file_name);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
@@ -430,6 +439,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   success = true;
 
  done:
+  //printf("[DEBUG] done success: %d\n", success);
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;
