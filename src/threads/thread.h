@@ -105,6 +105,7 @@ struct thread
     /* --- Edit for hw3 --- start */
     int exit_status;                   /* Process의 Exit Status를 저장  */
     struct file *fd[128];              /* Process가 열고 있는 파일 목록 (file descriptor) */
+    int fd_last;                       /* FD 배열의 끝부분 */
     bool load_success;                 /* exec-load 성공 여부 */
 
     struct thread *parent;             /* 부모 Process */

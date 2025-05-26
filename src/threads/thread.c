@@ -475,6 +475,7 @@ init_thread (struct thread *t, const char *name, int priority) // 새로운 thre
   /* --- Edit for hw3 --- start */
 #ifdef USERPROG
   int i;
+  
   for (i = 0; i < 128; i++) t->fd[i] = NULL; // file descriptor 초기화
 
   t->parent = running_thread ();    // 현재 thread를 부모로 설정

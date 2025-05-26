@@ -70,8 +70,6 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   }
   list_push_back (&cur->children, &child->child_elem); // 부모의 children list에 추가
 
-  // list_push_back (&cur->children, &child->child_elem); // 부모의 children list에 추가
-
   palloc_free_page (fn_copy);
   return tid;
 }
