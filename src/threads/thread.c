@@ -472,7 +472,7 @@ init_thread (struct thread *t, const char *name, int priority) // 새로운 thre
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  /* --- Edit for hw3 --- start */
+  /* --- Edit for (hw3) --- start */
 #ifdef USERPROG
   int i;
   

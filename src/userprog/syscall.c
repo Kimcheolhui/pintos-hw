@@ -4,6 +4,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+#include <string.h> // (hw3) 추가2
 #include "lib/user/syscall.h" // (hw3) 추가2
 #include "userprog/process.h" // (hw3) 추가
 #include "devices/shutdown.h" // (hw3) 추가
@@ -226,7 +227,6 @@ void syscall_halt (void) {
 
 void exit (int status) {
   int idx;
-  struct file * target_file;
   struct thread *cur = thread_current ();
   cur->exit_status = status;
 
@@ -326,6 +326,10 @@ sys_open (const char *file) {
   if (new_file == NULL)
     return -1;
 
+  // (hw3) ROX 대응: 자기 자신을 호출해서 연 경우, 쓰기를 차단한다.
+  if (!strcmp(thread_name(), file))
+    file_deny_write(new_file);
+
   // Process Open File Table 등록
   ret = add_file_to_table(new_file);
   if (ret == -1)
@@ -375,7 +379,7 @@ sys_close (int fd) {
   // make check 결과, STDIN과 STDOUT에 대해 Close를 시도할 경우 요청을 거부해야 한다.
   // 정답이 exit(-1)이거나 모두 출력 후 exit(0)을 출력하는 방식으로 진행됨. 
   if (fd == STDIN_FILENO || fd == STDOUT_FILENO)
-    return -1;
+    return;
 
   // dup가 없으니 Close하면 그냥 끊긴 걸로 간주한다.
   del_file_from_table(fd);

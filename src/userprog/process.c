@@ -441,7 +441,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   //printf("[DEBUG] done success: %d\n", success);
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  // file_close (file); /* (hw3) 수정: rox Lock을 위함 */
   return success;
 }
 
