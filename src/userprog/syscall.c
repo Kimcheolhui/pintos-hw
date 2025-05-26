@@ -231,7 +231,7 @@ void exit (int status) {
   cur->exit_status = status;
 
   // 열었던 파일 정리
-  for (idx = 0; idx < 128; idx++) {
+  for (idx = 2; idx < 128; idx++) {
     sys_close(idx);
   }
 
@@ -371,6 +371,10 @@ sys_close (int fd) {
   struct file * target_file = find_file_from_table(fd);
   if (target_file == NULL) // 애초에 초기화 X
     return;
+  // make check 결과, STDIN과 STDOUT에 대해 Close를 시도할 경우 요청을 거부해야 한다.
+  // 정답이 exit(-1)이거나 모두 출력 후 exit(0)을 출력하는 방식으로 진행됨. 
+  if (fd == STDIN_FILENO || fd == STDOUT_FILENO)
+    return -1;
 
   // dup가 없으니 Close하면 그냥 끊긴 걸로 간주한다.
   del_file_from_table(fd);
