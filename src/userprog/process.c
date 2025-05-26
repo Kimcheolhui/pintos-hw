@@ -74,6 +74,7 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
 
   //printf("[DEBUG] pass all\n");
   palloc_free_page (fn_copy);
+
   return tid;
 }
 
@@ -166,6 +167,8 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
     /* 6. 가짜 return 주소를 스택에 push */
     if_.esp -= sizeof(void *);
     *(void **)if_.esp = 0; // 가짜 return 주소를 스택에 저장 (NULL로 설정)
+
+    palloc_free_page(argv); /* (hw3) OOM 대응 */
   }
 
   palloc_free_page (file_name);
