@@ -23,6 +23,8 @@ static int sys_read (int fd, void *buf, unsigned size);
 static void check_user (const void *uaddr);
 static void syscall_handler (struct intr_frame *);
 
+static int exec (const char *cmd_line);
+
 void
 syscall_init (void) 
 {
@@ -32,11 +34,13 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
+  printf("핸들러핸들ㄹ러\n");
+  
   
   int *sp = f->esp;
   int syscall_num = *((int *) sp);
 
-  printf ("여기 도달하기는 하나?: %d\n", syscall_num);
+  printf("syscall_num: %d\n", syscall_num);
 
   switch (syscall_num) {
     case SYS_HALT:
@@ -46,7 +50,6 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_EXIT:
       { 
-        printf ("[DEBUG] EXIT하는 중 입니다\n: %d\n", sp[1]); // 디버깅용 출력
         // int status = *((int *) (sp + 4));
         check_user (sp + 1); // 사용자 영역 주소인지 확인
         exit (sp[1]);
@@ -54,7 +57,7 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_EXEC: 
       {
-        printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) sp[1]); // 디버깅용 출력
+        printf("나야나나야나");
         f->eax = exec ((const char*) sp[1]); 
         break;
       }
@@ -77,7 +80,7 @@ syscall_handler (struct intr_frame *f)
         break;
       }
     default:
-      printf ("[DEBUG] 알 수 없는 system call: %d\n", syscall_num);
+      printf("설마 여기?");
       exit (-1);
       break;
   }
@@ -94,6 +97,7 @@ void exit (int status) {
 }
 
 int exec (const char *cmd_line) {
+  printf("난가? exec\n");
   return process_execute (cmd_line);
 }
 
@@ -105,34 +109,37 @@ void syscall_halt (void) {
 
 static void check_user (const void *uaddr) {
   // if (!is_user_vaddr (uaddr) || pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
-  if (!is_user_vaddr (uaddr))
-    printf("정말 너니너ㅣ너니ㅓ니ㅓ니ㅓ니너니ㅓㄴ??????????\n");
+  if (!is_user_vaddr (uaddr)) {
     exit (-1);
+  }
 }
 
 
 static int
 syscall_write (int fd, const void *buffer, unsigned size)
 {
+  printf("syscall_write: fd=%d, size=%u\n", fd, size);
   check_user (buffer); // 사용자 영역 주소인지 확인
   /* 콘솔 출력만 지원 (fd==1) */
-  if (fd == 1)
-    {
+  if (fd == 1) {
+      printf("출력이 제대로 되나?\n");
       putbuf (buffer, size);
-      // printf("디버깅디버깅디버깅777777: %d\n", size); // 디버깅용 출력
       return (int) size;
-    }
+  } else {
+      printf("지원하지 않는 파일 디스크립터: %d\n", fd);
+  }
   /* 아직 지원 안 하는 경우 */
   return -1;
 }
 
 static int 
 sys_read (int fd, void *buf, unsigned size) {
+  printf("sys_read: fd=%d, size=%u\n", fd, size);
   check_user (buf);
   if (fd == 0) {
     unsigned i;
     for (i = 0; i < size; i++) ((uint8_t *)buf)[i] = input_getc ();
-    // printf("디버깅디버깅디버깅8888888: %d\n", size); // 디버깅용 출력
+
     return size;
   }
   return -1;

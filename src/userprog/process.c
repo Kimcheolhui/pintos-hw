@@ -70,8 +70,6 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   }
   list_push_back (&cur->children, &child->child_elem); // 부모의 children list에 추가
 
-  // list_push_back (&cur->children, &child->child_elem); // 부모의 children list에 추가
-
   palloc_free_page (fn_copy);
   return tid;
 }
@@ -106,6 +104,23 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
   } else {
 
     /* 3. User Stack 만들기 */
+
+    /* 이런 느낌 (https://web.stanford.edu/class/cs140/projects/pintos/pintos_3.html#SEC45)
+      Address	Name	Data	Type
+      0xbffffffc	argv[3][...]	bar\0	char[4]
+      0xbffffff8	argv[2][...]	foo\0	char[4]
+      0xbffffff5	argv[1][...]	-l\0	char[3]
+      0xbfffffed	argv[0][...]	/bin/ls\0	char[8]
+      0xbfffffec	word-align	0	uint8_t
+      0xbfffffe8	argv[4]	0	char *
+      0xbfffffe4	argv[3]	0xbffffffc	char *
+      0xbfffffe0	argv[2]	0xbffffff8	char *
+      0xbfffffdc	argv[1]	0xbffffff5	char *
+      0xbfffffd8	argv[0]	0xbfffffed	char *
+      0xbfffffd4	argv	0xbfffffd8	char **
+      0xbfffffd0	argc	4	int
+      0xbfffffcc	return address	0	void (*) ()
+    */
 
     // 3-1) argv 배열 만들기
     int argc = 0; // 인자 개수
@@ -147,8 +162,6 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
       if_.esp -= sizeof(char *);
       *(void **)if_.esp = argv[i]; // 인자 문자열이 저장된 User Stack 주소를 저장
     }
-
-    // TODO: 순서 반대가 아닌지 확인 필요
 
     /* 4. argv 배열의 시작 주소 스택에 push */
     void *argv_start_addr = if_.esp;
@@ -436,7 +449,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
@@ -479,6 +491,8 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
      it then user code that passed a null pointer to system calls
      could quite likely panic the kernel by way of null pointer
      assertions in memcpy(), etc. */
+
+  // if (phdr->p_offset < PGSIZE) // (hw3)
   if (phdr->p_vaddr < PGSIZE)
     return false;
 
