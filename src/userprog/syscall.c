@@ -48,7 +48,7 @@ syscall_handler (struct intr_frame *f)
   switch (syscall_num) {
     case SYS_HALT:
       {
-	printf("[DEBUG] SYS_HALT\n");
+	// printf("[DEBUG] SYS_HALT\n");
         syscall_halt ();
         break;
       }
@@ -62,13 +62,13 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_EXEC: 
       {
-        printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) sp[1]); // 디버깅용 출력
+        //printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) sp[1]); // 디버깅용 출력
         f->eax = exec ((const char*) sp[1]); 
         break;
       }
     case SYS_WAIT: 
     {
-      printf("[DEBUG] SYS_WAIT\n");
+      //printf("[DEBUG] SYS_WAIT\n");
       f->eax = sys_wait(sp[1]); 
       break;
     }
@@ -87,6 +87,7 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_CREATE:
       {
+        //printf("[SYS_CREATE] %s, %x\n", (char *)sp[1], sp[2]);
 	f->eax = sys_create((char *)sp[1], sp[2]);
         break;
       }
@@ -153,12 +154,46 @@ syscall_handler (struct intr_frame *f)
       }
     */
     default:
+      NOT_REACHED();
       printf ("[DEBUG] 알 수 없는 system call: %d\n", syscall_num);
       exit (-1);
       break;
   }
 
 }
+
+static int
+add_file_to_table(struct file * st_f) {
+  struct thread *t = thread_current();
+  struct file **table = t->fd;
+  int fd_idx = 3;
+
+  while (table[fd_idx] && (fd_idx < 128)) {
+    fd_idx++;
+  }
+
+  if (fd_idx >= 128)
+    return -1;
+  table[fd_idx] = st_f;
+  return fd_idx;
+}
+
+static struct file *
+find_file_from_table(int fd) {
+  struct thread *t = thread_current();
+  if (fd < 0 || fd >= 128)
+    return NULL;
+  return t->fd[fd];
+}
+
+static void
+del_file_from_table(int fd) {
+  struct thread *t = thread_current();
+  if (fd < 0 || fd >= 128)
+    return;
+  t->fd[fd] = NULL;
+}
+
 
 void syscall_halt (void) {
   shutdown_power_off ();
@@ -182,7 +217,8 @@ sys_wait (int pid) {
   return process_wait (pid);
 }
 
-static void check_user (const void *uaddr) {
+static void 
+check_user (const void *uaddr) {
   // if (!is_user_vaddr (uaddr) || pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
   if (uaddr == NULL || !is_user_vaddr (uaddr) || pagedir_get_page (thread_current()->pagedir, uaddr) == NULL) {
     exit (-1);
@@ -194,80 +230,135 @@ static int
 syscall_write (int fd, const void *buffer, unsigned size)
 {
   check_user (buffer); // 사용자 영역 주소인지 확인
+ 
+  if ((off_t)size < 0) // off_t 기준 음수일 수 있음;
+    return -1;
+ 
+  // FD가 잘못되었거나, fd가 STDIN인 경우 X
+  struct file * target_file = find_file_from_table(fd);
+  if (fd == STDIN_FILENO || target_file == NULL)
+    return -1;
+
   /* 콘솔 출력만 지원 (fd==1) */
   if (fd == 1)
-    {
-      putbuf (buffer, size);
-      // printf("디버깅디버깅디버깅777777: %d\n", size); // 디버깅용 출력
-      return (int) size;
-    }
-  /* 아직 지원 안 하는 경우 */
-  return -1;
+  {
+    putbuf (buffer, size);
+    return (int) size;
+  }
+
+  return file_write(target_file, buffer, size);
 }
 
 static int 
 sys_read (int fd, void *buf, unsigned size) {
   check_user (buf);
-  if (fd == 0) {
-    unsigned i;
-    for (i = 0; i < size; i++) ((uint8_t *)buf)[i] = input_getc ();
-    return size;
+  if ((off_t) size < 0)
+    return -1;
+
+  int ret;
+  unsigned i;
+  struct file* target_file;
+
+  // STDOUT은 미리 처리
+  if (fd == STDOUT_FILENO)
+    return -1;
+  // FD가 소멸된 경우 제거
+  target_file = find_file_from_table(fd);
+  if (target_file == NULL)
+    return -1;
+
+  // STDIN이 Close인 경우는 위에서 해결됨.
+  if (fd == STDIN_FILENO) {
+    for (i = 0; i < size; i++) {
+      ((uint8_t *)buf)[i] = input_getc ();
+      if (((uint8_t *)buf)[i] == '\0')
+        break;
+    }
+    return i;
   }
-  return -1;
+
+  // 일반 파일 읽기
+  ret = file_read(target_file, buf, size);
+  return ret;
 }
 
 static int
 sys_open (const char *file) {
-  struct thread *cur;
-  struct file** fdt;
+  struct file* new_file;
+  int ret;
 
   check_user(file);
 
-  cur = thread_current ();
-  fdt = cur->fd;
-
-  if (cur->fd_last >= 128) {
-    return -1; // FD 추가 불가
-  }
-
   // File 열기 시도
-  fdt[cur->fd_last] = filesys_open(file);
-  if (fdt[cur->fd_last] == NULL)
+  new_file = filesys_open(file);
+  if (new_file == NULL)
     return -1;
-  return cur->fd_last++;
+
+  // Process Open File Table 등록
+  ret = add_file_to_table(new_file);
+  if (ret == -1)
+    file_close(new_file);
+  return ret;
 }
 
 static int
 sys_filesize(int fd) {
-  printf("[DEBUG] Not Implemented\n");
-  return -1;
+  struct file * target_file = find_file_from_table(fd);
+  if (target_file == NULL)
+    return -1;
+
+  // STDIN, STDOUT의 크기를 정의할 수 있는가?
+  if (fd == STDIN_FILENO || fd == STDIN_FILENO)
+    return 0;
+
+  return file_length(target_file);
 }
 
 static void
 sys_seek(int fd, unsigned position) {
-  printf("[DEBUG] Not Implemented\n");
+  struct file * target_file = find_file_from_table(fd);
+  if (fd == STDIN_FILENO || fd == STDOUT_FILENO)
+    return;
+  if (target_file == NULL)
+    return;
+  if ((off_t)position < 0)
+    return;
+  file_seek(target_file, position);
 }
 
 static unsigned
 sys_tell (int fd) {
-  printf("[DEBUG] Not Implemented\n");
-  return -1;
+  struct file * target_file = find_file_from_table(fd);
+  
+  if (fd == STDIN_FILENO || fd == STDOUT_FILENO || target_file == NULL)
+    return -1;
+  return file_tell(target_file);
 }
 
 static void 
 sys_close (int fd) {
-  printf("[DEBUG] Not Implemented\n");
+  struct file * target_file = find_file_from_table(fd);
+  if (target_file == NULL) // 애초에 초기화 X
+    return;
+
+  // dup가 없으니 Close하면 그냥 끊긴 걸로 간주한다.
+  del_file_from_table(fd);
+  if (fd != STDIN_FILENO && fd != STDOUT_FILENO) {
+    file_close(target_file);
+  }
 }
 
 static bool
 sys_create (const char *file, unsigned initial_size) {
-  printf("[DEBUG] Not Implemented\n");
-  return -1;
+  check_user(file);
+  if ((int)initial_size < 0)
+    return -1;
+  return filesys_create(file, initial_size);
 }
 
 static bool
 sys_remove (const char *file) {
-  printf("[DEBUG] Not Implemented\n");
-  return -1;
+  check_user(file);
+  return filesys_remove(file);
 }
 

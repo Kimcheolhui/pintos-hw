@@ -476,7 +476,9 @@ init_thread (struct thread *t, const char *name, int priority) // 새로운 thre
 #ifdef USERPROG
   int i;
   
-  for (i = 0; i < 128; i++) t->fd[i] = NULL; // file descriptor 초기화
+  t->fd[0] = (void *)1; // 활성화 상태 의미. (Close 걸리면 0으로.)
+  t->fd[1] = (void *)1; // 활성화 상태 의미. (Close 걸리면 0으로.)
+  for (i = 2; i < 128; i++) t->fd[i] = NULL; // file descriptor 초기화
 
   t->parent = running_thread ();    // 현재 thread를 부모로 설정
   list_init (&t->children);         // 자식 Process 목록 초기화
