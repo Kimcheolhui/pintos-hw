@@ -115,8 +115,6 @@ struct thread
     struct semaphore child_sema; 
     struct semaphore load_sema;        /* exec-load 동기화 */
     struct semaphore memory_sema;      /* memory allocation 동기화 */
-
-   //  bool load_success; /* exec-load 성공 여부 */
    
     /* --- end --- */
 

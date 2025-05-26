@@ -137,9 +137,9 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
       *(uint8_t *)if_.esp = 0; // 0으로 채움
     }
 
-    // // 3-4). NULL sentinel 설정 (argv 배열의 끝을 NULL로 표시)
-    // if_.esp -= sizeof(char *);
-    // *(char **)if_.esp = NULL;
+    // 3-4). NULL sentinel 설정
+    if_.esp -= sizeof(char *);
+    *(char **)if_.esp = NULL;
 
     // 3-5). 인자가 저장된 User Stack 주소를 스택에 저장
     for (i = argc - 1; i >= 0; i--) {
@@ -147,10 +147,6 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
       if_.esp -= sizeof(char *);
       *(void **)if_.esp = argv[i]; // 인자 문자열이 저장된 User Stack 주소를 저장
     }
-
-    // 3-4). NULL sentinel 설정 (argv 배열의 끝을 NULL로 표시)
-    if_.esp -= sizeof(char *);
-    *(char **)if_.esp = NULL;
 
     // TODO: 순서 반대가 아닌지 확인 필요
 
