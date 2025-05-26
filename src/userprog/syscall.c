@@ -19,7 +19,7 @@
 // void syscall_exit (int status);
 // void syscall_halt (void);
 
-static int syscall_write (int fd, const void *buffer, unsigned size);
+static int sys_write (int fd, const void *buffer, unsigned size);
 static int sys_read (int fd, void *buf, unsigned size);
 static void check_user (const void *uaddr);
 static void syscall_handler (struct intr_frame *);
@@ -43,6 +43,8 @@ syscall_handler (struct intr_frame *f)
 {
   
   int *sp = f->esp;
+  check_user(sp);
+
   int syscall_num = *((int *) sp);
 
   switch (syscall_num) {
@@ -63,61 +65,87 @@ syscall_handler (struct intr_frame *f)
     case SYS_EXEC: 
       {
         //printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) sp[1]); // 디버깅용 출력
+        check_user(sp + 1);
         f->eax = exec ((const char*) sp[1]); 
         break;
       }
     case SYS_WAIT: 
     {
       //printf("[DEBUG] SYS_WAIT\n");
+      check_user(sp + 1);
       f->eax = sys_wait(sp[1]); 
       break;
     }
     case SYS_WRITE:
       {
+        check_user(sp + 1);
+        check_user(sp + 2);
+        check_user(sp + 3);
+
         int fd = sp[1];
         const void *buf = (const void *) sp[2];
         unsigned size = (unsigned) sp[3];
-        f->eax = syscall_write (fd, buf, size);
+        f->eax = sys_write (fd, buf, size);
         break;
       }
     case SYS_READ:
       {
+        check_user(sp + 1);
+        check_user(sp + 2);
+        check_user(sp + 3);
+
         f->eax = sys_read (sp[1], (void*)sp[2], sp[3]);
         break;
       }
     case SYS_CREATE:
       {
+        check_user(sp + 1);
+        check_user(sp + 2);
+
         //printf("[SYS_CREATE] %s, %x\n", (char *)sp[1], sp[2]);
 	f->eax = sys_create((char *)sp[1], sp[2]);
         break;
       }
     case SYS_REMOVE:
       {
+        check_user(sp + 1);
+
 	f->eax = sys_remove((char *)sp[1]);
         break;
       }
     case SYS_OPEN:
       {
+        check_user(sp + 1);
+
 	f->eax = sys_open((char *)sp[1]);
         break;
       }
     case SYS_FILESIZE:
       {
+        check_user(sp + 1);
+
 	f->eax = sys_filesize((int)sp[1]);
         break;
       }
     case SYS_SEEK:
       {
+        check_user(sp + 1);
+        check_user(sp + 2);
+
 	sys_seek((int)sp[1], (unsigned) sp[2]);
         break;
       }
     case SYS_TELL:
       {
+        check_user(sp + 1);
+
 	f->eax = sys_tell((int)sp[1]);
         break;
       }
     case SYS_CLOSE:
       {
+        check_user(sp + 1);
+
 	sys_close((int)sp[1]);
         break;
       }
@@ -154,12 +182,9 @@ syscall_handler (struct intr_frame *f)
       }
     */
     default:
-      NOT_REACHED();
-      printf ("[DEBUG] 알 수 없는 system call: %d\n", syscall_num);
+      //printf ("[DEBUG] 알 수 없는 system call: %d\n", syscall_num);
       exit (-1);
-      break;
   }
-
 }
 
 static int
@@ -200,8 +225,15 @@ void syscall_halt (void) {
 }
 
 void exit (int status) {
+  int idx;
+  struct file * target_file;
   struct thread *cur = thread_current ();
   cur->exit_status = status;
+
+  // 열었던 파일 정리
+  for (idx = 0; idx < 128; idx++) {
+    sys_close(idx);
+  }
 
   printf ("%s: exit(%d)\n", cur->name, status); // 종료 메시지 출력
 
@@ -225,9 +257,8 @@ check_user (const void *uaddr) {
   }
 }
 
-
 static int
-syscall_write (int fd, const void *buffer, unsigned size)
+sys_write (int fd, const void *buffer, unsigned size)
 {
   check_user (buffer); // 사용자 영역 주소인지 확인
  
@@ -352,7 +383,7 @@ static bool
 sys_create (const char *file, unsigned initial_size) {
   check_user(file);
   if ((int)initial_size < 0)
-    return -1;
+    return false;
   return filesys_create(file, initial_size);
 }
 

@@ -197,7 +197,7 @@ process_wait (tid_t child_tid)
     if (child->tid == child_tid) { // 자식 프로세스 찾음
       sema_down (&child->child_sema); // 자식 프로세스가 종료될 때까지 대기
       int exit_status = child->exit_status;
-      list_remove (elem); // 자식 프로세스 리스트에서 제거
+//      list_remove (elem); // 자식 프로세스 리스트에서 제거
       return exit_status; // 자식의 exit status 반환
     }
   }
