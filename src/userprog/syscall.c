@@ -56,7 +56,6 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_EXIT:
       { 
-        // int status = *((int *) (sp + 4));
         check_user (sp + 1); // 사용자 영역 주소인지 확인
         exit (sp[1]);
         break;
@@ -99,28 +98,28 @@ syscall_handler (struct intr_frame *f)
         check_user(sp + 1);
         check_user(sp + 2);
 
-	f->eax = sys_create((char *)sp[1], sp[2]);
+	      f->eax = sys_create((char *)sp[1], sp[2]);
         break;
       }
     case SYS_REMOVE:
       {
         check_user(sp + 1);
 
-	f->eax = sys_remove((char *)sp[1]);
+	      f->eax = sys_remove((char *)sp[1]);
         break;
       }
     case SYS_OPEN:
       {
         check_user(sp + 1);
 
-	f->eax = sys_open((char *)sp[1]);
+	      f->eax = sys_open((char *)sp[1]);
         break;
       }
     case SYS_FILESIZE:
       {
         check_user(sp + 1);
 
-	f->eax = sys_filesize((int)sp[1]);
+	      f->eax = sys_filesize((int)sp[1]);
         break;
       }
     case SYS_SEEK:
@@ -128,55 +127,23 @@ syscall_handler (struct intr_frame *f)
         check_user(sp + 1);
         check_user(sp + 2);
 
-	sys_seek((int)sp[1], (unsigned) sp[2]);
+	      sys_seek((int)sp[1], (unsigned) sp[2]);
         break;
       }
     case SYS_TELL:
       {
         check_user(sp + 1);
 
-	f->eax = sys_tell((int)sp[1]);
+	      f->eax = sys_tell((int)sp[1]);
         break;
       }
     case SYS_CLOSE:
       {
         check_user(sp + 1);
 
-	sys_close((int)sp[1]);
+	      sys_close((int)sp[1]);
         break;
       }
-    /*
-    case SYS_MMAP:
-      {
-
-        break;
-      }
-    case SYS_MUNMAP:
-      {
-
-        break;
-      }
-    case SYS_CHDIR:
-      {
-
-        break;
-      }
-    case SYS_MKDIR:
-      {
-
-        break;
-      }
-    case SYS_READDIR:
-      {
-
-        break;
-      }
-    case SYS_INUMBER:
-      {
-
-        break;
-      }
-    */
     default:
       exit (-1);
   }
@@ -246,7 +213,6 @@ sys_wait (int pid) {
 
 static void 
 check_user (const void *uaddr) {
-  // if (!is_user_vaddr (uaddr) || pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
   if (uaddr == NULL || !is_user_vaddr (uaddr) || pagedir_get_page (thread_current()->pagedir, uaddr) == NULL) {
     exit (-1);
   }

@@ -110,7 +110,6 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
 
     // 3-1) argv 배열 만들기
     int argc = 0; // 인자 개수
-    // char **argv[32]; // 최대 32개의 인자
     char **argv = palloc_get_page (0);
     char *token; // 각 인자 임시 저장
     for (token = program_name;
@@ -148,8 +147,6 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
       if_.esp -= sizeof(char *);
       *(void **)if_.esp = argv[i]; // 인자 문자열이 저장된 User Stack 주소를 저장
     }
-
-    // TODO: 순서 반대가 아닌지 확인 필요
 
     /* 4. argv 배열의 시작 주소 스택에 push */
     void *argv_start_addr = if_.esp;
