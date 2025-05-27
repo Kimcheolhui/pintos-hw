@@ -51,13 +51,11 @@ syscall_handler (struct intr_frame *f)
   switch (syscall_num) {
     case SYS_HALT:
       {
-	// printf("[DEBUG] SYS_HALT\n");
         syscall_halt ();
         break;
       }
     case SYS_EXIT:
       { 
-        //printf ("[DEBUG] EXIT하는 중 입니다: %d\n", sp[1]); // 디버깅용 출력
         // int status = *((int *) (sp + 4));
         check_user (sp + 1); // 사용자 영역 주소인지 확인
         exit (sp[1]);
@@ -65,14 +63,12 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_EXEC: 
       {
-        //printf ("[DEBUG] SYS_EXEC called with arg: %s\n", (const char*) sp[1]); // 디버깅용 출력
         check_user(sp + 1);
         f->eax = exec ((const char*) sp[1]); 
         break;
       }
     case SYS_WAIT: 
     {
-      //printf("[DEBUG] SYS_WAIT\n");
       check_user(sp + 1);
       f->eax = sys_wait(sp[1]); 
       break;
@@ -103,7 +99,6 @@ syscall_handler (struct intr_frame *f)
         check_user(sp + 1);
         check_user(sp + 2);
 
-        //printf("[SYS_CREATE] %s, %x\n", (char *)sp[1], sp[2]);
 	f->eax = sys_create((char *)sp[1], sp[2]);
         break;
       }
@@ -183,7 +178,6 @@ syscall_handler (struct intr_frame *f)
       }
     */
     default:
-      //printf ("[DEBUG] 알 수 없는 system call: %d\n", syscall_num);
       exit (-1);
   }
 }

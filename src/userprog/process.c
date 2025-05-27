@@ -64,7 +64,6 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   struct thread *child = get_thread_by_tid (tid);
   sema_down (&child->load_sema); // child가 load 결과 알려줄 때까지 대기
   
-  //printf("[DEBUG] child success: %d\n", child->load_success);
   if (!child->load_success) { // load 실패 시
     palloc_free_page (fn_copy);
     palloc_free_page (fn_copy_for_start_process);
@@ -72,7 +71,6 @@ process_execute (const char *file_name) /* --- (hw3) 전체 수정함 --- */
   }
   list_push_back (&cur->children, &child->child_elem); // 부모의 children list에 추가
 
-  //printf("[DEBUG] pass all\n");
   palloc_free_page (fn_copy);
 
   return tid;
@@ -102,8 +100,6 @@ start_process (void *file_name_) /* --- (hw3) 전체 수정함 --- */
   struct thread *cur = thread_current ();
   cur->load_success = success; // load 성공 여부 저장
   sema_up (&cur->load_sema); // load 결과를 부모 process에게 알림 (process_execute에서 대기 중인 부모에게 신호)
-
-  //printf("[DEBUG] success in start_process %d\n", cur->load_success);
 
   if (!success) { // load 실패 시
     cur->exit_status = -1;
@@ -352,7 +348,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  //printf("[DEBUG] filename: %s\n", file_name);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
@@ -442,7 +437,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   success = true;
 
  done:
-  //printf("[DEBUG] done success: %d\n", success);
   /* We arrive here whether the load is successful or not. */
   // file_close (file); /* (hw3) 수정: rox Lock을 위함 */
   return success;
